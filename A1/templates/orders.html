@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Orders – FreshGrocery</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<style>
+  .page-container { max-width: 900px; margin: 40px auto; padding: 0 20px; }
+  .page-title { font-family:'Poppins',sans-serif; font-size:1.8rem; font-weight:800; margin-bottom:24px; }
+  .order-card {
+    background: white; border-radius: 14px; padding: 22px 26px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.08); margin-bottom: 18px;
+    border-left: 5px solid #f39c12; transition: transform .2s;
+  }
+  .order-card:hover { transform: translateY(-2px); }
+  .order-card.delivered { border-left-color: #27ae60; }
+  .order-top { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
+  .order-id   { font-family:'Poppins',sans-serif; font-size:1.1rem; font-weight:800; }
+  .order-date { font-size:12px; color:#636e72; margin-top:3px; }
+  .order-meta { display:flex; gap:24px; font-size:14px; flex-wrap:wrap; }
+  .meta-item .lbl { color:#636e72; font-size:11px; text-transform:uppercase; letter-spacing:.5px; font-weight:700; }
+  .meta-item .val { font-weight:700; margin-top:2px; }
+  .order-actions { margin-top:14px; display:flex; gap:10px; }
+  .btn-track  { background:#1e3c72; color:white; border:none; padding:9px 16px; border-radius:8px; font-weight:700; font-size:13px; font-family:'Nunito',sans-serif; cursor:pointer; text-decoration:none; display:inline-block; }
+  .btn-items  { background:#f0f3f4; color:#2d3436; border:none; padding:9px 16px; border-radius:8px; font-weight:700; font-size:13px; font-family:'Nunito',sans-serif; cursor:pointer; }
+  .empty-state { text-align:center; padding:80px 20px; color:#636e72; }
+  .status-pending   { display:inline-block; background:#fff3cd; color:#856404; border:1.5px solid #ffc107; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:700; }
+  .status-delivered { display:inline-block; background:#d4edda; color:#155724; border:1.5px solid #28a745; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:700; }
+  /* Modal */
+  .modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:1000; align-items:center; justify-content:center; }
+  .modal-bg.open { display:flex; }
+  .modal { background:white; border-radius:14px; padding:28px; min-width:320px; max-width:420px; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+  .modal h3 { font-family:'Poppins',sans-serif; margin-bottom:16px; }
+  .modal-item { padding:8px 0; border-bottom:1px solid #f0f0f0; font-size:14px; display:flex; justify-content:space-between; }
+  .modal-close { margin-top:16px; padding:10px 20px; background:#2d3436; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:700; font-family:'Nunito',sans-serif; }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-brand">🛒 Fresh<span style="color:#27ae60;">Grocery</span></div>
+  <div class="nav-right">
+    {% if user %}<span>👤 {{ user.name }}</span>{% endif %}
+    <a href="/" style="color:white;">🏠 Home</a>
+    <a href="/logout" style="color:white;">Logout</a>
+  </div>
+</nav>
+
+<div class="page-container">
+  <div class="page-title">📋 My Orders</div>
+
+  {% if orders %}
+  {% for o in orders %}
+  <div class="order-card {{ 'delivered' if o.status == 'Delivered' else '' }}">
+    <div class="order-top">
+      <div>
+        <div class="order-id">Order #{{ o.id }}</div>
+      </div>
+      <span class="{{ 'status-delivered' if o.status == 'Delivered' else 'status-pending' }}">
+        {{ o.status }}
+      </span>
+    </div>
+
+    <div class="order-meta">
+      <div class="meta-item">
+        <div class="lbl">Total Amount</div>
+        <div class="val" style="color:#1e3c72;font-size:1.1rem;">₹{{ o.total_price }}</div>
+      </div>
+      <div class="meta-item">
+        <div class="lbl">Delivery Address</div>
+        <div class="val">{{ o.address }}</div>
+      </div>
+      <div class="meta-item">
+        <div class="lbl">Phone</div>
+        <div class="val">{{ o.phone or '—' }}</div>
+      </div>
+    </div>
+
+    <div class="order-actions">
+      {% if o.status == 'Pending' %}
+      <a href="/track" class="btn-track">🚚 Track Order</a>
+      {% endif %}
+      <button class="btn-items" onclick="viewItems({{ o.id }})">📦 View Items</button>
+    </div>
+  </div>
+  {% endfor %}
+
+  {% else %}
+  <div class="empty-state">
+    <div style="font-size:5rem;margin-bottom:16px;">📦</div>
+    <h2>No orders yet</h2>
+    <p style="margin-top:8px;">Start shopping and your orders will appear here.</p>
+    <a href="/" style="display:inline-block;margin-top:20px;padding:12px 28px;background:#1e3c72;color:white;border-radius:10px;font-weight:700;">Shop Now →</a>
+  </div>
+  {% endif %}
+</div>
+
+<!-- MODAL -->
+<div id="modalBg" class="modal-bg" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>📦 Order Items</h3>
+    <div id="modalItems"></div>
+    <button class="modal-close" onclick="closeModal()">Close</button>
+  </div>
+</div>
+
+<script>
+function viewItems(orderId) {
+  fetch('/order-items/' + orderId)
+  .then(r => r.json())
+  .then(data => {
+    let html  = '';
+    let total = 0;
+    data.forEach(item => {
+      const sub  = item.price * item.qty;
+      total     += sub;
+      html      += `<div class="modal-item"><span>${item.name} × ${item.qty}</span><span style="font-weight:800;">₹${sub}</span></div>`;
+    });
+    html += `<div style="display:flex;justify-content:space-between;font-weight:800;padding-top:12px;border-top:2px solid #1e3c72;margin-top:8px;">
+      <span>Total</span><span style="color:#1e3c72;">₹${total}</span></div>`;
+    document.getElementById('modalItems').innerHTML = html;
+    document.getElementById('modalBg').classList.add('open');
+  });
+}
+
+function closeModal(e) {
+  if (!e || e.target === document.getElementById('modalBg')) {
+    document.getElementById('modalBg').classList.remove('open');
+  }
+}
+</script>
+</body>
+</html>

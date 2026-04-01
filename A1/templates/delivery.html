@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Delivery Dashboard – FreshGrocery</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  body { background: #f0f2f5; }
+  .page-wrapper { display: flex; min-height: 100vh; }
+
+  /* ── SIDEBAR ── */
+  .sidebar { width: 240px; background: linear-gradient(180deg, #1e3c72, #2a5298); color: white; padding: 28px 20px; display: flex; flex-direction: column; justify-content: space-between; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
+  .sidebar-brand { font-family: 'Poppins', sans-serif; font-size: 1.1rem; font-weight: 800; margin-bottom: 30px; }
+  .sidebar-user { background: rgba(255,255,255,.12); border-radius: 10px; padding: 12px; margin-bottom: 20px; }
+  .sidebar-user .name { font-weight: 700; font-size: 15px; }
+  .sidebar-user .role { font-size: 12px; opacity: .7; margin-top: 3px; }
+  .sidebar-logout { display: block; background: white; color: #1e3c72; text-align: center; padding: 10px; border-radius: 8px; font-weight: 700; font-size: 14px; text-decoration: none; }
+
+  /* ── MAIN ── */
+  .main-content { margin-left: 240px; flex: 1; padding: 30px; }
+  .page-title { font-family: 'Poppins', sans-serif; font-size: 1.6rem; font-weight: 800; margin-bottom: 8px; }
+  .stats-row { display: flex; gap: 16px; margin-bottom: 28px; flex-wrap: wrap; }
+  .stat-card { background: white; border-radius: 12px; padding: 18px 22px; flex: 1; min-width: 120px; box-shadow: 0 4px 16px rgba(0,0,0,.07); }
+  .stat-card .val { font-size: 2rem; font-weight: 800; color: #1e3c72; }
+  .stat-card .lbl { font-size: 12px; color: #636e72; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-top: 4px; }
+
+  /* ── ORDER CARDS ── */
+  .orders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; }
+  .order-card { background: white; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,.08); border-left: 4px solid #f39c12; }
+  .order-card.delivered { border-left-color: #27ae60; }
+  .order-card-body { padding: 22px; }
+  .order-num { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 1.1rem; margin-bottom: 12px; }
+  .order-info { font-size: 14px; margin-bottom: 5px; display: flex; gap: 8px; }
+  .order-info .lbl { color: #636e72; min-width: 60px; font-weight: 700; }
+  .badge-pending   { display: inline-block; background: #f39c12; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; margin: 10px 0; }
+  .badge-delivered { display: inline-block; background: #27ae60; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; margin: 10px 0; }
+  .card-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .btn-start    { background: #27ae60; color: white; border: none; padding: 9px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 700; font-family: 'Nunito', sans-serif; transition: background .2s; }
+  .btn-start:hover { background: #219a52; }
+  .btn-start:disabled { background: #b2bec3; cursor: default; }
+  .btn-view-map { background: #1e3c72; color: white; border: none; padding: 9px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 700; font-family: 'Nunito', sans-serif; }
+  .btn-view     { background: #2d3436; color: white; border: none; padding: 9px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 700; font-family: 'Nunito', sans-serif; }
+  .btn-deliver  { background: #0984e3; color: white; border: none; padding: 9px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 700; font-family: 'Nunito', sans-serif; text-decoration: none; display: inline-block; }
+  .empty-state  { text-align: center; padding: 60px; color: #636e72; }
+
+  /* ── MAP PANEL ── */
+  .map-panel { display: none; background: white; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,.12); margin-bottom: 24px; }
+  .map-panel.open { display: block; }
+  .map-panel-header { background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; padding: 16px 22px; display: flex; justify-content: space-between; align-items: center; }
+  .map-panel-header h3 { font-family: 'Poppins', sans-serif; font-size: 1rem; font-weight: 800; }
+  .btn-close-map { background: rgba(255,255,255,.18); border: none; color: white; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 700; font-family: 'Nunito', sans-serif; }
+  #deliveryMap { height: 420px; width: 100%; }
+
+  .map-legend { display: flex; gap: 18px; flex-wrap: wrap; padding: 10px 20px; background: #fff; border-top: 1px solid #f0f0f0; font-size: 13px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-weight: 700; color: #2d3436; }
+  .legend-line { width: 28px; height: 4px; border-radius: 4px; }
+
+  .map-info-bar { padding: 12px 20px; background: #f8f9fa; display: flex; gap: 24px; flex-wrap: wrap; font-size: 14px; border-top: 1px solid #f0f0f0; align-items: center; }
+  .map-info-bar .mi span { font-weight: 800; color: #1e3c72; }
+  .tracking-active { display: inline-flex; align-items: center; gap: 6px; background: #d4edda; color: #155724; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+  .tracking-dot { width: 7px; height: 7px; border-radius: 50%; background: #27ae60; animation: blink 1s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* ── GPS STATUS ── */
+  .gps-status { font-size: 13px; padding: 8px 14px; border-radius: 8px; margin: 0 20px 12px; background: #fff3cd; color: #856404; }
+  .gps-status.got { background: #d4edda; color: #155724; }
+  .gps-status.err { background: #f8d7da; color: #721c24; }
+
+  /* ── MODAL ── */
+  .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 3000; align-items: center; justify-content: center; }
+  .modal-bg.open { display: flex; }
+  .modal { background: white; border-radius: 14px; padding: 28px; min-width: 320px; max-width: 440px; box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+  .modal h3 { font-family: 'Poppins', sans-serif; margin-bottom: 16px; color: #1e3c72; }
+  .modal-item { padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; display: flex; justify-content: space-between; }
+  .modal-total { display: flex; justify-content: space-between; font-weight: 800; font-size: 15px; padding-top: 12px; border-top: 2px solid #1e3c72; margin-top: 8px; color: #1e3c72; }
+  .modal-close { margin-top: 16px; padding: 10px 20px; background: #2d3436; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-family: 'Nunito', sans-serif; width: 100%; }
+</style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div>
+      <div class="sidebar-brand">🚚 Delivery Panel</div>
+      <div class="sidebar-user">
+        <div class="name">{{ user.name if user else 'Delivery' }}</div>
+        <div class="role">Delivery Agent</div>
+      </div>
+    </div>
+    <a href="/logout" class="sidebar-logout">⬅ Logout</a>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="main-content">
+    <div class="page-title">📦 Orders to Deliver</div>
+    <p style="color:#636e72;margin-bottom:20px;">Accept and track your delivery assignments</p>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="val">{{ orders|length }}</div>
+        <div class="lbl">Pending Orders</div>
+      </div>
+    </div>
+
+    <!-- ══ LIVE MAP PANEL ══ -->
+    <div class="map-panel" id="mapPanel">
+      <div class="map-panel-header">
+        <h3>📍 Live Delivery Map — <span id="mapOrderLabel">Order #</span></h3>
+        <button class="btn-close-map" onclick="closeMap()">✕ Close Map</button>
+      </div>
+
+      <div id="gpsStatus" class="gps-status">📍 Getting your location…</div>
+      <div id="deliveryMap"></div>
+
+      <!-- Legend -->
+      <div class="map-legend">
+        <div class="legend-item">🏪 Store (Pickup)</div>
+        <div class="legend-item">
+          <div class="legend-line" style="background:#e67e22;"></div> Store → You
+        </div>
+        <div class="legend-item">🚚 You (Delivery)</div>
+        <div class="legend-item">
+          <div class="legend-line" style="background:#1e3c72;"></div> You → Customer
+        </div>
+        <div class="legend-item">🏠 Customer</div>
+      </div>
+
+      <!-- Info bar -->
+      <div class="map-info-bar">
+        <div class="mi">📦 Store → You: <span id="mapDistStore">—</span></div>
+        <div class="mi">🏠 You → Customer: <span id="mapDist">—</span></div>
+        <div class="mi">⏱ ETA: <span id="mapETA">—</span></div>
+        <div class="mi" id="trackingBadgeWrap" style="display:none;">
+          <span class="tracking-active"><span class="tracking-dot"></span> GPS Active</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ ORDER CARDS ══ -->
+    <div class="orders-grid">
+      {% for order in orders %}
+      <div class="order-card" id="card-{{ order.id }}">
+        <div class="order-card-body">
+          <div class="order-num">Order #{{ order.id }}</div>
+          <div class="order-info"><span class="lbl">👤 User</span><span>#{{ order.user_id }}</span></div>
+          <div class="order-info"><span class="lbl">💰 Total</span><span style="font-weight:800;color:#1e3c72;">₹{{ order.total_price }}</span></div>
+          <div class="order-info"><span class="lbl">📍 Addr</span><span>{{ order.address or '—' }}</span></div>
+          <div class="order-info"><span class="lbl">📞 Phone</span><span>{{ order.phone or '—' }}</span></div>
+
+          {% if order.user_lat and order.user_lng %}
+          <div class="order-info">
+            <span class="lbl">🗺 GPS</span>
+            <span style="color:#27ae60;font-weight:700;">
+              {{ "%.4f"|format(order.user_lat) }}, {{ "%.4f"|format(order.user_lng) }}
+            </span>
+          </div>
+          {% else %}
+          <div class="order-info">
+            <span class="lbl">🗺 GPS</span>
+            <span style="color:#e74c3c;">No customer GPS</span>
+          </div>
+          {% endif %}
+
+          <span class="{{ 'badge-delivered' if order.status == 'Delivered' else 'badge-pending' }}">
+            {{ order.status }}
+          </span>
+
+          <div class="card-actions">
+
+            <!-- Start GPS tracking -->
+            <button class="btn-start"
+                    id="start-{{ order.id }}"
+                    onclick="startTracking({{ order.id }}, this)">
+              🚚 Start Tracking
+            </button>
+
+            <!-- View map — enabled only if customer has GPS -->
+            {% if order.user_lat and order.user_lng %}
+            <button class="btn-view-map"
+                    onclick="openMap({{ order.id }}, {{ order.user_lat }}, {{ order.user_lng }})">
+              🗺 View Map
+            </button>
+            {% else %}
+            <button class="btn-view-map" disabled style="opacity:.45;cursor:not-allowed;"
+                    title="Customer has no GPS location">
+              🗺 No GPS
+            </button>
+            {% endif %}
+
+            <!-- View items -->
+            <button class="btn-view" onclick="viewItems({{ order.id }})">👁 Items</button>
+
+            <!-- Mark as delivered -->
+            {% if order.status == 'Pending' %}
+            <a href="/deliver-order/{{ order.id }}"
+               class="btn-deliver"
+               onclick="return confirm('Mark Order #{{ order.id }} as Delivered?')">
+              ✅ Delivered
+            </a>
+            {% endif %}
+
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+
+      {% if not orders %}
+      <div class="empty-state">
+        <div style="font-size:4rem;margin-bottom:16px;">🎉</div>
+        <h3>All deliveries complete!</h3>
+        <p style="margin-top:8px;">No pending orders right now.</p>
+      </div>
+      {% endif %}
+    </div>
+
+  </div><!-- /.main-content -->
+</div><!-- /.page-wrapper -->
+
+<!-- ══ ITEMS MODAL ══ -->
+<div id="modalBg" class="modal-bg" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>📦 Order Items</h3>
+    <div id="modalItems"><p style="color:#636e72;">Loading…</p></div>
+    <button class="modal-close" onclick="closeModal()">Close</button>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+//  Store config from Flask
+// ════════════════════════════════════════════════════════════════
+const STORE_LAT = {{ store_lat | default('') | tojson }};
+const STORE_LNG = {{ store_lng | default('') | tojson }};
+
+const storeLat = STORE_LAT ? parseFloat(STORE_LAT) : null;
+const storeLng = STORE_LNG ? parseFloat(STORE_LNG) : null;
+
+// ── Leaflet state ─────────────────────────────────────────────
+let map            = null;
+let myMarker       = null;
+let customerMk     = null;
+let storeMk        = null;
+let routeToCustomer = null;
+let routeFromStore  = null;
+let activeOrderId   = null;
+let lastRouteFetch  = 0;
+
+// ── Custom icons ──────────────────────────────────────────────
+const makeIcon = emoji => L.divIcon({
+  html: `<div style="font-size:32px;filter:drop-shadow(0 3px 6px rgba(0,0,0,.45));">${emoji}</div>`,
+  iconSize: [36,36], iconAnchor: [18,36], className: ''
+});
+const homeIcon  = makeIcon('🏠');
+const storeIcon = makeIcon('🏪');
+const myIcon    = makeIcon('🚚');
+
+// ════════════════════════════════════════════════════════════════
+//  OSRM real road routing
+// ════════════════════════════════════════════════════════════════
+async function fetchOSRMRoute(fromLat, fromLng, toLat, toLng) {
+  const url = `https://router.project-osrm.org/route/v1/driving/` +
+              `${fromLng},${fromLat};${toLng},${toLat}` +
+              `?overview=full&geometries=geojson&steps=false`;
+  try {
+    const res  = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const data = await res.json();
+    if (data.code !== 'Ok' || !data.routes || !data.routes.length) throw new Error('No route');
+    const route   = data.routes[0];
+    const latlngs = route.geometry.coordinates.map(c => [c[1], c[0]]);
+    return {
+      latlngs,
+      distKm:  (route.distance / 1000).toFixed(2),
+      durMins: Math.round(route.duration / 60)
+    };
+  } catch(e) {
+    throw new Error('OSRM failed: ' + e.message);
+  }
+}
+
+// Draw straight dashed fallback line
+function drawFallback(existingLayer, lat1, lng1, lat2, lng2, color) {
+  if (existingLayer && map && map.hasLayer(existingLayer)) map.removeLayer(existingLayer);
+  return L.polyline([[lat1,lng1],[lat2,lng2]], {
+    color, weight: 4, dashArray: '10 8', opacity: .75
+  }).addTo(map);
+}
+
+// ════════════════════════════════════════════════════════════════
+//  Draw BOTH routes: Store→Me (orange) + Me→Customer (blue)
+// ════════════════════════════════════════════════════════════════
+async function drawAllRoutes(myLat, myLng, custLat, custLng) {
+  if (!map) return;
+
+  // Route 1: Me → Customer (blue)
+  try {
+    const r1 = await fetchOSRMRoute(myLat, myLng, custLat, custLng);
+    if (routeToCustomer && map.hasLayer(routeToCustomer)) map.removeLayer(routeToCustomer);
+    routeToCustomer = L.polyline(r1.latlngs, {
+      color: '#1e3c72', weight: 6, opacity: 0.85, lineJoin: 'round', lineCap: 'round'
+    }).addTo(map);
+    document.getElementById('mapDist').innerText = r1.distKm + ' km';
+    const eta = r1.durMins < 1 ? 'Arriving 🎉'
+              : r1.durMins < 60 ? `~${r1.durMins} min`
+              : `~${Math.floor(r1.durMins/60)}h ${r1.durMins%60}m`;
+    document.getElementById('mapETA').innerText = eta;
+  } catch(e) {
+    console.warn('Me→Customer route failed, using straight line:', e.message);
+    routeToCustomer = drawFallback(routeToCustomer, myLat, myLng, custLat, custLng, '#1e3c72');
+    document.getElementById('mapDist').innerText = '(straight line)';
+  }
+
+  // Route 2: Store → Me (orange)
+  if (storeLat && storeLng) {
+    try {
+      const r2 = await fetchOSRMRoute(storeLat, storeLng, myLat, myLng);
+      if (routeFromStore && map.hasLayer(routeFromStore)) map.removeLayer(routeFromStore);
+      routeFromStore = L.polyline(r2.latlngs, {
+        color: '#e67e22', weight: 5, opacity: 0.80, lineJoin: 'round', lineCap: 'round'
+      }).addTo(map);
+      document.getElementById('mapDistStore').innerText = r2.distKm + ' km';
+    } catch(e) {
+      console.warn('Store→Me route failed, using straight line:', e.message);
+      routeFromStore = drawFallback(routeFromStore, storeLat, storeLng, myLat, myLng, '#e67e22');
+    }
+  }
+
+  // Fit all points
+  const points = [[myLat, myLng], [custLat, custLng]];
+  if (storeLat && storeLng) points.push([storeLat, storeLng]);
+  map.fitBounds(points, { padding: [60, 60], maxZoom: 16 });
+}
+
+// ════════════════════════════════════════════════════════════════
+//  Open map panel for a specific order
+// ════════════════════════════════════════════════════════════════
+function openMap(orderId, custLat, custLng) {
+  const panel = document.getElementById('mapPanel');
+  panel.classList.add('open');
+  document.getElementById('mapOrderLabel').innerText = 'Order #' + orderId;
+  activeOrderId = orderId;
+
+  const cLat = parseFloat(custLat);
+  const cLng = parseFloat(custLng);
+
+  // Init Leaflet map once
+  if (!map) {
+    const initLat = storeLat || cLat || 17.385;
+    const initLng = storeLng || cLng || 78.486;
+    map = L.map('deliveryMap').setView([initLat, initLng], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19
+    }).addTo(map);
+  } else {
+    map.invalidateSize();
+    // Remove old routes when switching orders
+    if (routeToCustomer && map.hasLayer(routeToCustomer)) map.removeLayer(routeToCustomer);
+    if (routeFromStore  && map.hasLayer(routeFromStore))  map.removeLayer(routeFromStore);
+    routeToCustomer = null;
+    routeFromStore  = null;
+  }
+
+  // Store marker
+  if (storeMk) map.removeLayer(storeMk);
+  if (storeLat && storeLng) {
+    storeMk = L.marker([storeLat, storeLng], { icon: storeIcon, zIndexOffset: 500 }).addTo(map);
+    storeMk.bindTooltip('🏪 Store (Pickup Point)', { permanent: true, direction: 'top' });
+  }
+
+  // Customer marker
+  if (customerMk) map.removeLayer(customerMk);
+  if (!isNaN(cLat) && !isNaN(cLng)) {
+    customerMk = L.marker([cLat, cLng], { icon: homeIcon }).addTo(map);
+    customerMk.bindTooltip('🏠 Customer Location', { permanent: true, direction: 'top' });
+  }
+
+  // Reset info bar
+  document.getElementById('mapDist').innerText      = '…';
+  document.getElementById('mapDistStore').innerText = '…';
+  document.getElementById('mapETA').innerText       = '…';
+
+  const gpsEl = document.getElementById('gpsStatus');
+  gpsEl.className = 'gps-status';
+  gpsEl.innerText = '📍 Getting your location…';
+
+  // Get delivery boy's GPS, then draw routes
+  if (!navigator.geolocation) {
+    gpsEl.className = 'gps-status err';
+    gpsEl.innerText = '⚠ GPS not supported on this device.';
+    // Still show store + customer
+    if (storeLat && storeLng && !isNaN(cLat)) {
+      map.fitBounds([[storeLat, storeLng], [cLat, cLng]], { padding: [60, 60] });
+    } else if (!isNaN(cLat)) {
+      map.setView([cLat, cLng], 14);
+    }
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const { latitude: lat, longitude: lng } = pos.coords;
+      gpsEl.className = 'gps-status got';
+      gpsEl.innerText = `✅ Your location: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+
+      // Place / update delivery boy marker
+      if (myMarker) map.removeLayer(myMarker);
+      myMarker = L.marker([lat, lng], { icon: myIcon, zIndexOffset: 1000 }).addTo(map);
+      myMarker.bindTooltip('🚚 You (Delivery)', { permanent: true, direction: 'top' });
+
+      // Draw both road routes
+      if (!isNaN(cLat) && !isNaN(cLng)) {
+        drawAllRoutes(lat, lng, cLat, cLng);
+      }
+    },
+    err => {
+      gpsEl.className = 'gps-status err';
+      gpsEl.innerText = '⚠ Location denied. Enable GPS and try again.';
+      // Show what we can
+      const pts = [];
+      if (storeLat && storeLng) pts.push([storeLat, storeLng]);
+      if (!isNaN(cLat)) pts.push([cLat, cLng]);
+      if (pts.length > 1) map.fitBounds(pts, { padding: [60, 60] });
+      else if (pts.length === 1) map.setView(pts[0], 14);
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
+
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function closeMap() {
+  document.getElementById('mapPanel').classList.remove('open');
+}
+
+// ════════════════════════════════════════════════════════════════
+//  Start live GPS tracking → push to server + update map
+// ════════════════════════════════════════════════════════════════
+const watchIds = {};
+
+function startTracking(orderId, btn) {
+  if (!navigator.geolocation) {
+    alert('Geolocation not supported on this device.'); return;
+  }
+  btn.innerText = '✅ Tracking Active';
+  btn.disabled  = true;
+  document.getElementById('trackingBadgeWrap').style.display = 'block';
+
+  const watchId = navigator.geolocation.watchPosition(
+    pos => {
+      const { latitude: lat, longitude: lng } = pos.coords;
+
+      // Push to server
+      fetch('/update-location', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ order_id: orderId, lat, lng })
+      }).catch(() => {});
+
+      // Update my marker on map (if open)
+      if (map) {
+        if (myMarker) {
+          myMarker.setLatLng([lat, lng]);
+        } else {
+          myMarker = L.marker([lat, lng], { icon: myIcon, zIndexOffset: 1000 }).addTo(map);
+          myMarker.bindTooltip('🚚 You (Delivery)', { permanent: true, direction: 'top' });
+        }
+
+        // Redraw routes at most every 15 seconds
+        if (customerMk) {
+          const cPos = customerMk.getLatLng();
+          const now  = Date.now();
+          if (now - lastRouteFetch > 15000) {
+            lastRouteFetch = now;
+            drawAllRoutes(lat, lng, cPos.lat, cPos.lng);
+          }
+        }
+      }
+    },
+    err => {
+      console.warn('GPS watch error:', err.message);
+      btn.innerText = '⚠ GPS Error';
+      btn.disabled  = false;
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+  );
+  watchIds[orderId] = watchId;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  View Items modal  →  calls /delivery-items/<id>
+// ════════════════════════════════════════════════════════════════
+function viewItems(orderId) {
+  const modalItems = document.getElementById('modalItems');
+  modalItems.innerHTML = '<p style="color:#636e72;padding:10px 0;">Loading items…</p>';
+  document.getElementById('modalBg').classList.add('open');
+
+  fetch('/delivery-items/' + orderId)
+    .then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(data => {
+      if (!data.length) {
+        modalItems.innerHTML = '<p style="color:#636e72;">No items found.</p>';
+        return;
+      }
+      let html = '', total = 0;
+      data.forEach(item => {
+        const sub = item.price * item.qty;
+        total += sub;
+        html += `<div class="modal-item">
+                   <span>${item.name} × ${item.qty}</span>
+                   <span style="font-weight:800;">₹${sub.toFixed(2)}</span>
+                 </div>`;
+      });
+      html += `<div class="modal-total"><span>Total</span><span>₹${total.toFixed(2)}</span></div>`;
+      modalItems.innerHTML = html;
+    })
+    .catch(err => {
+      modalItems.innerHTML = `<p style="color:#e74c3c;">Failed to load items: ${err.message}</p>`;
+    });
+}
+
+function closeModal(e) {
+  if (!e || e.target === document.getElementById('modalBg'))
+    document.getElementById('modalBg').classList.remove('open');
+}
+</script>
+</body>
+</html>

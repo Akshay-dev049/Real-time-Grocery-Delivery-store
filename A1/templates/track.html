@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Track Order – FreshGrocery</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  .track-container { max-width: 960px; margin: 30px auto; padding: 0 20px; }
+  .track-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,.12); }
+  .track-header { background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; padding: 24px 28px; }
+  .track-header h2 { font-family: 'Poppins', sans-serif; font-size: 1.4rem; margin-bottom: 4px; }
+  .track-header p  { opacity: .8; font-size: 14px; }
+  #map { height: 460px; width: 100%; }
+  .track-footer { padding: 20px 28px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; background: #fafbfc; border-top: 1px solid #f0f0f0; }
+  .eta-box { background: white; border-radius: 12px; padding: 14px 24px; text-align: center; box-shadow: 0 2px 12px rgba(0,0,0,.08); min-width: 140px; }
+  .eta-label { font-size: 11px; color: #636e72; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+  .eta-value { font-size: 1.5rem; font-weight: 800; color: #1e3c72; margin-top: 4px; }
+  .status-timeline { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .status-step { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #b2bec3; }
+  .status-step.done   { color: #27ae60; }
+  .status-step.active { color: #1e3c72; }
+  .status-dot { width: 12px; height: 12px; border-radius: 50%; background: #dfe6e9; flex-shrink: 0; }
+  .status-step.done   .status-dot { background: #27ae60; }
+  .status-step.active .status-dot { background: #1e3c72; animation: pulse 1.5s infinite; }
+  .step-arrow { color: #dfe6e9; font-size: 16px; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(1.3)} }
+  .no-order-box { text-align: center; padding: 80px 20px; }
+  .no-order-box .icon { font-size: 5rem; margin-bottom: 16px; }
+  .info-strip { display: flex; gap: 24px; padding: 14px 28px; background: #f8f9fa; border-bottom: 1px solid #e8eaed; flex-wrap: wrap; }
+  .info-item .lbl { color: #636e72; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; font-weight: 700; }
+  .info-item .val { font-weight: 800; margin-top: 2px; font-size: 14px; }
+  .live-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(46,204,113,0.18); color: #2ecc71; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #2ecc71; animation: pulse 1.2s infinite; flex-shrink: 0; }
+  /* distance pill shown below map */
+  .dist-pill { font-size: 13px; color: #636e72; padding: 0 28px 12px; background: #fafbfc; }
+  .dist-pill span { font-weight: 800; color: #1e3c72; }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-brand">🛒 Fresh<span style="color:#27ae60;">Grocery</span></div>
+  <div class="nav-right">
+    <a href="/" style="color:white;">🏠 Home</a>
+    <a href="/orders" style="color:white;">My Orders</a>
+    <a href="/logout" style="color:white;">Logout</a>
+  </div>
+</nav>
+
+<div class="track-container">
+{% if order %}
+
+<div class="track-card">
+  <div class="track-header">
+    <h2>🚚 Live Order Tracking &nbsp;<span class="live-badge"><span class="live-dot"></span> LIVE</span></h2>
+    <p>Order #{{ order.id }} — {{ order.address }}</p>
+  </div>
+
+  <div class="info-strip">
+    <div class="info-item"><div class="lbl">Order ID</div><div class="val">#{{ order.id }}</div></div>
+    <div class="info-item"><div class="lbl">Total</div><div class="val">₹{{ order.total_price }}</div></div>
+    <div class="info-item"><div class="lbl">Status</div><div class="val" id="orderStatus">{{ order.status }}</div></div>
+    <div class="info-item"><div class="lbl">Phone</div><div class="val">{{ order.phone or '—' }}</div></div>
+    <div class="info-item"><div class="lbl">Address</div><div class="val">{{ order.address }}</div></div>
+  </div>
+
+  <div id="map"></div>
+
+  <!-- Road distance info -->
+  <div class="dist-pill" id="distPill" style="display:none;">
+    🚚 Delivery Boy is <span id="distVal">—</span> away by road
+  </div>
+
+  <div class="track-footer">
+    <div class="status-timeline">
+      <div class="status-step done" id="st-placed"><div class="status-dot"></div> Order Placed</div>
+      <div class="step-arrow">→</div>
+      <div class="status-step" id="st-preparing"><div class="status-dot"></div> Preparing</div>
+      <div class="step-arrow">→</div>
+      <div class="status-step" id="st-delivery"><div class="status-dot"></div> Out for Delivery</div>
+      <div class="step-arrow">→</div>
+      <div class="status-step" id="st-delivered"><div class="status-dot"></div> Delivered</div>
+    </div>
+    <div class="eta-box">
+      <div class="eta-label">⏱ ETA</div>
+      <div class="eta-value" id="etaValue">—</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ORDER_ID = {{ order.id }};
+const USER_LAT = {{ order.user_lat | tojson }};
+const USER_LNG = {{ order.user_lng | tojson }};
+
+// ── Init Leaflet map ─────────────────────────────────────────────
+const map = L.map('map').setView([USER_LAT || 17.3850, USER_LNG || 78.4867], 15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>', maxZoom: 19
+}).addTo(map);
+
+// ── Icons ─────────────────────────────────────────────────────────
+const homeIcon = L.divIcon({
+  html: `<div style="font-size:34px;line-height:1;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.5));">🏠</div>`,
+  iconSize: [36,36], iconAnchor: [18,36], className: ''
+});
+
+function makeTruckIcon(deg) {
+  return L.divIcon({
+    html: `<div style="font-size:34px;line-height:1;transform:rotate(${deg}deg);
+                       filter:drop-shadow(0 3px 6px rgba(0,0,0,0.5));
+                       transition:transform 0.5s linear;">🚚</div>`,
+    iconSize: [36,36], iconAnchor: [18,18], className: ''
+  });
+}
+
+// ── State ────────────────────────────────────────────────────────
+let homeMarker  = null;
+let truckMarker = null;
+let routeLine   = null;   // real OSRM road polyline
+let animId      = null;
+
+let curLat = null, curLng = null;   // smooth animated position
+let tgtLat = null, tgtLng = null;   // latest server position
+let bearing = 0;
+const LERP = 0.06;
+
+// Place home marker
+if (USER_LAT && USER_LNG) {
+  homeMarker = L.marker([USER_LAT, USER_LNG], {icon: homeIcon}).addTo(map);
+  homeMarker.bindTooltip('📍 Your Location', {permanent: true, direction: 'top'});
+}
+
+// ── Utilities ─────────────────────────────────────────────────────
+function getBearing(lat1, lng1, lat2, lng2) {
+  const r = d => d * Math.PI / 180;
+  const dL = r(lng2 - lng1);
+  const y  = Math.sin(dL) * Math.cos(r(lat2));
+  const x  = Math.cos(r(lat1)) * Math.sin(r(lat2)) - Math.sin(r(lat1)) * Math.cos(r(lat2)) * Math.cos(dL);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  OSRM real road route — same engine as the delivery boy's map
+//  Draws solid blue road path from truck to customer's home
+// ════════════════════════════════════════════════════════════════
+let lastRouteFetch = 0;   // throttle OSRM calls
+
+async function drawRoadRoute(fromLat, fromLng, toLat, toLng) {
+  // Throttle: max one OSRM call every 8 seconds
+  const now = Date.now();
+  if (now - lastRouteFetch < 8000) return;
+  lastRouteFetch = now;
+
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/` +
+                `${fromLng},${fromLat};${toLng},${toLat}` +
+                `?overview=full&geometries=geojson&steps=false`;
+
+    const res  = await fetch(url);
+    const data = await res.json();
+
+    if (data.code !== 'Ok' || !data.routes.length) {
+      drawFallbackLine(fromLat, fromLng, toLat, toLng);
+      return;
+    }
+
+    const route   = data.routes[0];
+    const latlngs = route.geometry.coordinates.map(c => [c[1], c[0]]);
+    const distKm  = (route.distance / 1000).toFixed(2);
+    const durMins = Math.round(route.duration / 60);
+
+    // Remove old route and draw new road path
+    if (routeLine && map.hasLayer(routeLine)) map.removeLayer(routeLine);
+    routeLine = L.polyline(latlngs, {
+      color:    '#1e3c72',
+      weight:   6,
+      opacity:  0.85,
+      lineJoin: 'round',
+      lineCap:  'round'
+    }).addTo(map);
+
+    // Fit map to show entire route
+    map.fitBounds(routeLine.getBounds(), {padding: [70, 70], maxZoom: 16, animate: true});
+
+    // Update ETA and distance pill
+    const eta = durMins < 1 ? 'Arriving 🎉'
+              : durMins < 60 ? `~${durMins} min`
+              : `~${Math.round(durMins/60)}h ${durMins%60}m`;
+
+    if (document.getElementById('orderStatus').innerText !== 'Delivered') {
+      document.getElementById('etaValue').innerText = eta;
+    }
+
+    const pill = document.getElementById('distPill');
+    pill.style.display = 'block';
+    document.getElementById('distVal').innerText = distKm + ' km';
+
+  } catch (err) {
+    console.warn('OSRM failed, falling back to straight line:', err);
+    drawFallbackLine(fromLat, fromLng, toLat, toLng);
+  }
+}
+
+// Fallback: dashed straight line if OSRM is unavailable
+function drawFallbackLine(fromLat, fromLng, toLat, toLng) {
+  if (routeLine && map.hasLayer(routeLine)) map.removeLayer(routeLine);
+  routeLine = L.polyline([[fromLat,fromLng],[toLat,toLng]], {
+    color: '#1e3c72', weight: 5, dashArray: '12 8', opacity: .75
+  }).addTo(map);
+  map.fitBounds([[USER_LAT, USER_LNG],[fromLat, fromLng]], {padding:[70,70], maxZoom:16, animate:true});
+}
+
+// ── Smooth animation loop (lerp) ─────────────────────────────────
+function animateTruck() {
+  if (tgtLat !== null) {
+    if (curLat === null) { curLat = tgtLat; curLng = tgtLng; }
+
+    const pLat = curLat, pLng = curLng;
+    curLat += (tgtLat - curLat) * LERP;
+    curLng += (tgtLng - curLng) * LERP;
+
+    // Update bearing when moving
+    if (Math.hypot(curLat - pLat, curLng - pLng) > 1e-7)
+      bearing = getBearing(pLat, pLng, curLat, curLng);
+
+    // Place or move truck marker
+    if (!truckMarker) {
+      truckMarker = L.marker([curLat, curLng], {icon: makeTruckIcon(bearing), zIndexOffset: 1000}).addTo(map);
+      truckMarker.bindTooltip('🚚 Delivery Boy', {permanent: true, direction: 'top'});
+    } else {
+      truckMarker.setLatLng([curLat, curLng]);
+      truckMarker.setIcon(makeTruckIcon(bearing));
+    }
+
+    // Draw real road route (throttled)
+    if (USER_LAT && USER_LNG) {
+      drawRoadRoute(curLat, curLng, USER_LAT, USER_LNG);
+    }
+  }
+  animId = requestAnimationFrame(animateTruck);
+}
+
+// ── Waiting overlay ───────────────────────────────────────────────
+function showWaiting() {
+  if (document.getElementById('waitingOverlay')) return;
+  const d = document.getElementById('map');
+  d.style.position = 'relative';
+  const el = document.createElement('div');
+  el.id = 'waitingOverlay';
+  el.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1000;background:rgba(255,255,255,.96);padding:26px 36px;border-radius:14px;text-align:center;box-shadow:0 6px 30px rgba(0,0,0,.18);font-family:Nunito,sans-serif;pointer-events:none;';
+  el.innerHTML = '<div style="font-size:3rem;">🚚</div><div style="font-weight:800;font-size:16px;color:#1e3c72;margin-top:10px;">Waiting for delivery to start</div><div style="color:#636e72;font-size:13px;margin-top:6px;">Truck will appear once delivery begins</div>';
+  d.appendChild(el);
+}
+function hideWaiting() {
+  const el = document.getElementById('waitingOverlay');
+  if (el) el.remove();
+}
+
+// ── Poll server every 4 s ─────────────────────────────────────────
+function loadTracking() {
+  fetch('/get-tracking/' + ORDER_ID)
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) return;
+    const dLat = data.delivery_lat ? parseFloat(data.delivery_lat) : null;
+    const dLng = data.delivery_lng ? parseFloat(data.delivery_lng) : null;
+
+    if (dLat && dLng && !isNaN(dLat)) {
+      hideWaiting();
+      tgtLat = dLat; tgtLng = dLng;
+      if (!animId) animateTruck();
+    } else {
+      showWaiting();
+      document.getElementById('etaValue').innerText = 'Waiting…';
+    }
+    updateTimeline(data.status || 'Pending');
+  })
+  .catch(e => console.warn('poll error', e));
+}
+
+// ── Timeline ──────────────────────────────────────────────────────
+function updateTimeline(status) {
+  document.getElementById('orderStatus').innerText = status;
+  ['st-placed','st-preparing','st-delivery','st-delivered'].forEach(id =>
+    document.getElementById(id).className = 'status-step');
+  document.getElementById('st-placed').className = 'status-step done';
+  if (status === 'Pending') {
+    document.getElementById('st-preparing').className = 'status-step active';
+  } else if (status === 'Out for Delivery') {
+    document.getElementById('st-preparing').className = 'status-step done';
+    document.getElementById('st-delivery').className  = 'status-step active';
+  } else if (status === 'Delivered') {
+    ['st-preparing','st-delivery','st-delivered'].forEach(id =>
+      document.getElementById(id).className = 'status-step done');
+    document.getElementById('etaValue').innerText = 'Delivered ✅';
+    if (animId) { cancelAnimationFrame(animId); animId = null; }
+  }
+}
+
+// ── Init ─────────────────────────────────────────────────────────
+updateTimeline('{{ order.status }}');
+{% if not order.delivery_lat %}showWaiting();{% else %}animateTruck();{% endif %}
+loadTracking();
+setInterval(loadTracking, 4000);
+</script>
+
+{% else %}
+<div class="track-card">
+  <div class="no-order-box">
+    <div class="icon">📦</div>
+    <h2 style="font-family:'Poppins',sans-serif;">No Active Order</h2>
+    <p style="color:#636e72;margin-top:8px;">Place an order to track your delivery</p>
+    <a href="/" style="display:inline-block;margin-top:20px;padding:12px 28px;background:#1e3c72;color:white;border-radius:10px;font-weight:700;">Shop Now →</a>
+  </div>
+</div>
+{% endif %}
+</div>
+</body>
+</html>

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FreshGrocery – Home</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+  /* Out-of-stock overlay on card */
+  .card.oos { opacity: .65; }
+  .oos-label { background:#e74c3c; color:white; font-size:11px; font-weight:700; padding:3px 10px;
+               border-radius:20px; display:inline-block; margin-bottom:6px; }
+  .stock-info { font-size:11px; color:#636e72; margin-top:4px; }
+  .stock-info.low { color:#e67e22; font-weight:700; }
+</style>
+</head>
+<body>
+
+<!-- ── NAVBAR ── -->
+<nav class="navbar">
+  <div class="navbar-brand">🛒 Fresh<span>Grocery</span></div>
+
+  <form class="navbar-search" action="/search" method="GET">
+    <i class="fa fa-search" style="color:rgba(255,255,255,.5);"></i>
+    <input type="text" name="q" placeholder="Search products..." value="{{ search_query or '' }}" autocomplete="off">
+    <button type="submit" style="background:rgba(255,255,255,.2);border:none;color:white;padding:4px 10px;border-radius:15px;cursor:pointer;font-size:13px;font-weight:700;font-family:Nunito,sans-serif;">🔍</button>
+  </form>
+
+  <div class="nav-right">
+    {% if user %}
+      <span style="font-weight:700;">👤 {{ user.name }}</span>
+      <a href="/orders">My Orders</a>
+      <a href="#" onclick="openCart()" class="btn-cart">
+        <i class="fa fa-shopping-cart"></i> Cart
+      </a>
+      <a href="/logout">Logout</a>
+    {% else %}
+      <a href="/login">Login</a>
+      <a href="/register">Register</a>
+    {% endif %}
+  </div>
+</nav>
+
+<!-- ── CATEGORY BAR ── -->
+<div class="categories">
+  <div class="left-menu">
+    <a href="/">🏠 Home</a>
+  </div>
+  <div class="right-menu">
+    <a href="/">All</a>
+    <a href="/search?q=Dairy">Dairy</a>
+    <a href="/search?q=Fruits">Fruits</a>
+    <a href="/search?q=Vegetables">Vegetables</a>
+    <a href="/search?q=Bakery">Bakery</a>
+    {% if user %}
+      {% if has_order %}
+        <a href="/track"><button class="track-btn">🚚 Track Order</button></a>
+      {% else %}
+        <span class="track-disabled">⚠ No active order</span>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── HERO ── -->
+<div class="banner">
+  <h1>🥦 Fresh Groceries, Delivered Fast</h1>
+  <p>Best quality products at unbeatable prices — order now!</p>
+  {% if not user %}
+  <a href="/register" style="display:inline-block;margin-top:18px;padding:12px 28px;
+     background:#27ae60;color:white;border-radius:30px;font-weight:800;font-size:15px;
+     text-decoration:none;">🛒 Shop Now – Register Free</a>
+  {% endif %}
+</div>
+
+<!-- ── PRODUCTS ── -->
+<div class="products">
+  {% for p in products %}
+  <div class="card {% if p.stock == 0 %}oos{% endif %}">
+    <img src="{{ url_for('static', filename='images/' + (p.image if p.image else 'default.png')) }}"
+         alt="{{ p.name }}"
+         onerror="this.src='https://via.placeholder.com/300x170/e8f5e9/27ae60?text=🥬'">
+    <div class="card-body">
+      <div style="font-size:11px;color:#636e72;font-weight:700;text-transform:uppercase;margin-bottom:4px;">
+        {{ p.category or 'General' }}
+      </div>
+      {% if p.stock == 0 %}
+      <span class="oos-label">Out of Stock</span>
+      {% elif p.stock <= 10 %}
+      <div class="stock-info low">⚠ Only {{ p.stock }} left!</div>
+      {% endif %}
+      <h3>{{ p.name }}</h3>
+      <div class="price">₹{{ p.price }}</div>
+
+      {% if user %}
+        {% if p.stock > 0 %}
+          <button onclick="addToCart({{ p.id }})">🛒 Add to Cart</button>
+        {% else %}
+          <button disabled style="background:#b2bec3;cursor:not-allowed;">Out of Stock</button>
+        {% endif %}
+      {% else %}
+        <a href="/login"><button>🔑 Login to Buy</button></a>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+
+  {% if not products %}
+  <div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:#636e72;">
+    <div style="font-size:4rem;">🔍</div>
+    <h2>No products found</h2>
+    <p>Try a different search term</p>
+    <a href="/" style="color:#2a5298;font-weight:700;">← Back to all products</a>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ── CART SIDEBAR (only for logged-in users) ── -->
+{% if user %}
+<div id="cartSidebar" class="cart-sidebar">
+  <h2>🛒 Your Cart</h2>
+  <div id="cartItems"></div>
+  <div class="cart-total-line">
+    <span>Total</span>
+    <span>₹<span id="totalPrice">0</span></span>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <button class="btn-primary"   onclick="goToCart()">View Cart</button>
+    <button class="btn-secondary" onclick="goToCheckout()">Checkout →</button>
+  </div>
+  <button class="close-sidebar-btn" onclick="closeCart()">✕ Close</button>
+</div>
+<div id="overlay" onclick="closeCart()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:999;"></div>
+{% endif %}
+
+<script>
+function addToCart(productId) {
+  fetch('/add-to-cart', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({product_id: productId})
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.error) { alert(data.error); return; }
+    openCart();
+    loadCartSidebar();
+  });
+}
+
+function loadCartSidebar() {
+  fetch('/get-cart')
+  .then(res => res.json())
+  .then(cart => {
+    let html = '', total = 0;
+    if (cart.length === 0) {
+      html = '<p style="color:#636e72;text-align:center;padding:20px;">Your cart is empty 🛒</p>';
+    }
+    cart.forEach(item => {
+      let sub = item.price * item.qty; total += sub;
+      html += `
+        <div class="cart-item">
+          <div>
+            <div style="font-weight:700;font-size:14px;">${item.name}</div>
+            <div style="color:#636e72;font-size:12px;">₹${item.price} × ${item.qty}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-weight:800;">₹${sub}</span>
+            <button class="remove-btn" onclick="removeItem(${item.id})">✕</button>
+          </div>
+        </div>`;
+    });
+    document.getElementById('cartItems').innerHTML  = html;
+    document.getElementById('totalPrice').innerText = total;
+  });
+}
+
+function removeItem(id) {
+  fetch('/remove-item', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({id})
+  }).then(() => loadCartSidebar());
+}
+
+function openCart() {
+  document.getElementById('cartSidebar').style.right = '0';
+  document.getElementById('overlay').style.display   = 'block';
+  loadCartSidebar();
+}
+function closeCart() {
+  document.getElementById('cartSidebar').style.right = '-380px';
+  document.getElementById('overlay').style.display   = 'none';
+}
+function goToCart()     { window.location.href = '/cart'; }
+function goToCheckout() { window.location.href = '/checkout'; }
+</script>
+</body>
+</html>

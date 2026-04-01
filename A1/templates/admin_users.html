@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>All Users – Admin</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  body { background: #f0f2f5; }
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width:240px; background:linear-gradient(180deg,#1a252f,#2c3e50); color:white; padding:28px 0; display:flex; flex-direction:column; position:fixed; top:0; left:0; bottom:0; z-index:100; }
+  .sidebar-brand { padding:0 20px 24px; font-family:'Poppins',sans-serif; font-size:1.1rem; font-weight:800; border-bottom:1px solid rgba(255,255,255,.1); margin-bottom:16px; }
+  .nav-item { display:flex; align-items:center; gap:10px; padding:12px 20px; color:rgba(255,255,255,.7); font-size:14px; font-weight:600; text-decoration:none; transition:all .2s; }
+  .nav-item:hover, .nav-item.active { background:rgba(255,255,255,.1); color:white; }
+  .sidebar-footer { margin-top:auto; padding:20px; border-top:1px solid rgba(255,255,255,.1); }
+  .sidebar-user { font-size:14px; font-weight:600; opacity:.8; margin-bottom:12px; }
+  .sidebar-logout { display:block; background:rgba(255,255,255,.12); color:white; text-align:center; padding:10px; border-radius:8px; font-weight:700; font-size:13px; text-decoration:none; }
+  .main { margin-left:240px; padding:32px; flex:1; }
+  .page-header { margin-bottom:24px; }
+  .page-header h1 { font-family:'Poppins',sans-serif; font-size:1.5rem; font-weight:800; }
+  .stats-row { display:flex; gap:16px; margin-bottom:28px; flex-wrap:wrap; }
+  .stat-pill { background:white; border-radius:12px; padding:16px 22px; flex:1; min-width:120px; box-shadow:0 2px 12px rgba(0,0,0,.06); border-left:4px solid; }
+  .stat-pill.blue   { border-color:#0984e3; }
+  .stat-pill.green  { border-color:#27ae60; }
+  .stat-pill.orange { border-color:#f39c12; }
+  .stat-pill .val { font-size:1.8rem; font-weight:800; color:#2d3436; font-family:'Poppins',sans-serif; }
+  .stat-pill .lbl { font-size:11px; color:#636e72; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-top:2px; }
+  .toolbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px; padding:18px 22px 0; }
+  .toolbar h3 { font-family:'Poppins',sans-serif; font-weight:700; }
+  .search-input { padding:10px 16px; border:1.5px solid #dfe6e9; border-radius:8px; font-size:14px; font-family:'Nunito',sans-serif; outline:none; width:260px; }
+  .table-card { background:white; border-radius:14px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.06); margin-bottom:28px; }
+  .role-admin    { background:#1e3c72; color:white; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+  .role-delivery { background:#f39c12; color:white; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+  .role-user     { background:#dfe6e9; color:#2d3436; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+  .gps-badge-yes { background:#d4edda; color:#155724; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+  .gps-badge-no  { background:#ffeaa7; color:#856404; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+  .map-modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:2000; align-items:center; justify-content:center; }
+  .map-modal-bg.open { display:flex; }
+  .map-modal { background:white; border-radius:16px; overflow:hidden; width:680px; max-width:96vw; box-shadow:0 20px 60px rgba(0,0,0,.35); }
+  .map-modal-header { background:linear-gradient(135deg,#1e3c72,#2a5298); color:white; padding:18px 24px; display:flex; justify-content:space-between; align-items:center; }
+  .map-modal-header h3 { font-family:'Poppins',sans-serif; font-weight:800; }
+  .btn-close-modal { background:rgba(255,255,255,.18); border:none; color:white; padding:7px 16px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:700; font-family:'Nunito',sans-serif; }
+  #userMap { height:380px; width:100%; }
+  .map-modal-footer { padding:14px 20px; background:#f8f9fa; font-size:14px; color:#636e72; }
+  .map-modal-footer strong { color:#1e3c72; }
+  .btn-loc { background:#1e3c72; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:700; font-family:'Nunito',sans-serif; }
+  .btn-loc:disabled { background:#b2bec3; cursor:default; }
+  .btn-del-user { background:#e74c3c; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:700; font-family:'Nunito',sans-serif; text-decoration:none; }
+  .detail-modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:2000; align-items:center; justify-content:center; }
+  .detail-modal-bg.open { display:flex; }
+  .detail-modal { background:white; border-radius:16px; padding:30px; width:440px; max-width:96vw; box-shadow:0 20px 60px rgba(0,0,0,.35); }
+  .detail-modal h3 { font-family:'Poppins',sans-serif; font-weight:800; margin-bottom:20px; color:#1e3c72; }
+  .detail-row { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #f0f0f0; font-size:14px; }
+  .detail-row .dk { color:#636e72; font-weight:700; }
+  .detail-row .dv { font-weight:800; color:#2d3436; }
+  .detail-close { margin-top:18px; padding:10px 20px; background:#2d3436; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:700; font-family:'Nunito',sans-serif; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-brand">🛒 FreshGrocery<br><span style="font-size:11px;opacity:.5;font-weight:400;">Admin Panel</span></div>
+    <a href="/admin"          class="nav-item"><span>📊</span> Dashboard</a>
+    <a href="/admin/products" class="nav-item"><span>📦</span> Products</a>
+    <a href="/admin/orders"   class="nav-item"><span>🛒</span> Orders</a>
+    <a href="/admin/users"    class="nav-item active"><span>👥</span> Users</a>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">👤 {{ user.name if user else 'Admin' }}</div>
+      <a href="/logout" class="sidebar-logout">Logout</a>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="page-header">
+      <h1>👥 All Users</h1>
+      <p style="color:#636e72;margin-top:4px;">Manage users, view locations, and monitor roles</p>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats-row">
+      <div class="stat-pill blue">
+        <div class="val">{{ users|length }}</div>
+        <div class="lbl">Total Users</div>
+      </div>
+      <div class="stat-pill green">
+        <div class="val">{{ users|selectattr('role','eq','user')|list|length }}</div>
+        <div class="lbl">Customers</div>
+      </div>
+      <div class="stat-pill orange">
+        <div class="val">{{ users|selectattr('role','eq','delivery')|list|length }}</div>
+        <div class="lbl">Delivery Boys</div>
+      </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-card">
+      <div class="toolbar">
+        <h3>All Users ({{ users|length }})</h3>
+        <input type="text" class="search-input" id="searchInput"
+               placeholder="Search by name, email, role..."
+               onkeyup="filterUsers()">
+      </div>
+      <table id="usersTable">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>GPS Location</th>
+            <th>Orders</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr class="user-row" data-search="{{ u.id }} {{ u.name }} {{ u.email }} {{ u.role }}">
+            <td style="color:#636e72;font-size:12px;">#{{ u.id }}</td>
+            <td style="text-align:left;font-weight:700;">
+              <div>{{ u.name }}</div>
+            </td>
+            <td style="text-align:left;font-size:13px;color:#636e72;">{{ u.email }}</td>
+            <td>
+              <span class="role-{{ u.role }}">
+                {% if u.role == 'admin' %}🔑 Admin
+                {% elif u.role == 'delivery' %}🚚 Delivery
+                {% else %}👤 User
+                {% endif %}
+              </span>
+            </td>
+            <td>
+              {% if u.latitude and u.longitude %}
+                <span class="gps-badge-yes">📍 Available</span>
+              {% else %}
+                <span class="gps-badge-no">❌ None</span>
+              {% endif %}
+            </td>
+            <td style="font-weight:700;">{{ order_counts.get(u.id, 0) }}</td>
+            <td>
+              <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">
+
+                <button class="btn-loc"
+                  data-user='{{ users_data[loop.index0] | tojson | safe }}'
+                  onclick='viewDetail(JSON.parse(this.dataset.user))'
+                  title="View full details">🔍 Details</button>
+
+                {% if u.latitude and u.longitude %}
+                <button class="btn-loc" style="background:#27ae60;"
+                  onclick="viewOnMap({{ u.id }}, '{{ u.name }}', {{ u.latitude }}, {{ u.longitude }})"
+                  title="View on map">🗺 Map</button>
+                {% else %}
+                <button class="btn-loc" disabled title="No GPS data">🗺 Map</button>
+                {% endif %}
+
+                {% if u.role != 'admin' %}
+                <a href="/admin/delete-user/{{ u.id }}"
+                   class="btn-del-user"
+                   onclick="return confirm('Delete user {{ u.name }}? This cannot be undone.')">🗑</a>
+                {% endif %}
+
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+          {% if not users %}
+          <tr><td colspan="7" style="padding:40px;color:#636e72;">No users found.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- MAP MODAL -->
+<div id="mapModalBg" class="map-modal-bg" onclick="closeMapModal(event)">
+  <div class="map-modal" onclick="event.stopPropagation()">
+    <div class="map-modal-header">
+      <h3>🗺 User Location — <span id="mapUserName"></span></h3>
+      <button class="btn-close-modal" onclick="closeMapModal()">✕ Close</button>
+    </div>
+    <div id="userMap"></div>
+    <div class="map-modal-footer" id="mapModalFooter"></div>
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div id="detailModalBg" class="detail-modal-bg" onclick="closeDetailModal(event)">
+  <div class="detail-modal" onclick="event.stopPropagation()">
+    <h3>👤 User Details</h3>
+    <div id="detailContent"></div>
+    <button class="detail-close" onclick="closeDetailModal()">Close</button>
+  </div>
+</div>
+
+<script>
+let userMap = null;
+let userMarker = null;
+
+function viewOnMap(userId, userName, lat, lng) {
+  document.getElementById('mapUserName').innerText = userName;
+  document.getElementById('mapModalBg').classList.add('open');
+
+  setTimeout(() => {
+    if (!userMap) {
+      userMap = L.map('userMap').setView([lat, lng], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19
+      }).addTo(userMap);
+    } else {
+      userMap.invalidateSize();
+      userMap.setView([lat, lng], 15);
+    }
+
+    if (userMarker) userMap.removeLayer(userMarker);
+    const icon = L.divIcon({
+      html: `<div style="font-size:34px;filter:drop-shadow(0 3px 6px rgba(0,0,0,.45));">📍</div>`,
+      iconSize: [36,36], iconAnchor: [18,36], className: ''
+    });
+    userMarker = L.marker([lat, lng], {icon}).addTo(userMap);
+    userMarker.bindTooltip(`📍 ${userName}`, {permanent: true, direction: 'top'});
+
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+    .then(r => r.json())
+    .then(data => {
+      const addr = data.display_name || 'Address unavailable';
+      document.getElementById('mapModalFooter').innerHTML =
+        `<strong>Coordinates:</strong> ${lat.toFixed(5)}, ${lng.toFixed(5)} &nbsp;|&nbsp;
+         <strong>Address:</strong> ${addr}`;
+    })
+    .catch(() => {
+      document.getElementById('mapModalFooter').innerHTML =
+        `<strong>Coordinates:</strong> ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    });
+
+    userMap.invalidateSize();
+  }, 120);
+}
+
+function closeMapModal(e) {
+  if (!e || e.target === document.getElementById('mapModalBg'))
+    document.getElementById('mapModalBg').classList.remove('open');
+}
+
+function viewDetail(u) {
+  const roleLabel = {admin:'🔑 Admin', delivery:'🚚 Delivery', user:'👤 Customer'}[u.role] || u.role;
+  const gpsInfo = (u.latitude && u.longitude)
+    ? `${parseFloat(u.latitude).toFixed(5)}, ${parseFloat(u.longitude).toFixed(5)}`
+    : 'Not available';
+
+  document.getElementById('detailContent').innerHTML = `
+    <div class="detail-row"><span class="dk">🆔 User ID</span><span class="dv">#${u.id}</span></div>
+    <div class="detail-row"><span class="dk">👤 Name</span><span class="dv">${u.name}</span></div>
+    <div class="detail-row"><span class="dk">📧 Email</span><span class="dv">${u.email}</span></div>
+    <div class="detail-row"><span class="dk">🏷 Role</span><span class="dv">${roleLabel}</span></div>
+    <div class="detail-row"><span class="dk">📍 GPS</span><span class="dv">${gpsInfo}</span></div>
+  `;
+  document.getElementById('detailModalBg').classList.add('open');
+}
+
+function closeDetailModal(e) {
+  if (!e || e.target === document.getElementById('detailModalBg'))
+    document.getElementById('detailModalBg').classList.remove('open');
+}
+
+function filterUsers() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  document.querySelectorAll('.user-row').forEach(row => {
+    row.style.display = row.getAttribute('data-search').toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+</script>
+</body>
+</html>

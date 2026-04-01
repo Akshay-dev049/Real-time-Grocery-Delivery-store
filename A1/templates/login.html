@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login – FreshGrocery</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Poppins:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Nunito',sans-serif;min-height:100vh;display:flex;
+       background:linear-gradient(135deg,#1e3c72 0%,#2a5298 60%,#27ae60 100%);
+       align-items:center;justify-content:center;}
+  .auth-card{background:white;border-radius:20px;padding:44px 40px;width:100%;max-width:420px;
+             box-shadow:0 20px 60px rgba(0,0,0,.25);}
+  .logo{font-family:'Poppins',sans-serif;font-size:1.8rem;font-weight:800;color:#1e3c72;
+        text-align:center;margin-bottom:6px;}
+  .logo span{color:#27ae60;}
+  .subtitle{text-align:center;color:#636e72;font-size:14px;margin-bottom:30px;}
+  h2{font-family:'Poppins',sans-serif;font-size:1.4rem;font-weight:700;margin-bottom:24px;color:#2d3436;}
+  .form-group{margin-bottom:18px;}
+  .form-group label{display:block;font-size:13px;font-weight:700;color:#636e72;margin-bottom:6px;
+                    text-transform:uppercase;letter-spacing:.5px;}
+  .form-group input{width:100%;padding:13px 16px;border:2px solid #dfe6e9;border-radius:10px;
+                    font-size:15px;font-family:'Nunito',sans-serif;outline:none;transition:border-color .2s;}
+  .form-group input:focus{border-color:#2a5298;}
+  .btn-login{width:100%;padding:14px;background:linear-gradient(135deg,#1e3c72,#2a5298);
+             color:white;border:none;border-radius:10px;font-size:16px;font-weight:800;
+             font-family:'Nunito',sans-serif;cursor:pointer;margin-top:8px;transition:opacity .2s;}
+  .btn-login:hover{opacity:.9;}
+  .btn-register{display:block;text-align:center;margin-top:14px;padding:12px;background:#f0f3f4;
+                border:none;border-radius:10px;font-size:14px;font-weight:700;font-family:'Nunito',sans-serif;
+                cursor:pointer;color:#2d3436;transition:background .2s;text-decoration:none;}
+  .btn-register:hover{background:#dfe6e9;}
+  .forgot-link{display:block;text-align:center;margin-top:12px;color:#2a5298;font-size:13px;
+               font-weight:700;text-decoration:none;}
+  .forgot-link:hover{text-decoration:underline;}
+  .error-msg{background:#ffeaa7;color:#d63031;padding:10px 14px;border-radius:8px;font-size:13px;
+             font-weight:600;margin-bottom:16px;border-left:4px solid #d63031;}
+  .success-msg{background:#d4edda;color:#155724;padding:10px 14px;border-radius:8px;font-size:13px;
+               font-weight:600;margin-bottom:16px;border-left:4px solid #27ae60;}
+  .demo-accounts{margin-top:20px;padding:14px;background:#f8f9fa;border-radius:10px;
+                 font-size:12px;color:#636e72;}
+  .demo-accounts strong{color:#2d3436;display:block;margin-bottom:6px;}
+  .demo-accounts span{display:block;margin-bottom:3px;}
+</style>
+</head>
+<body>
+<div class="auth-card">
+  <div class="logo">🛒 Fresh<span>Grocery</span></div>
+  <div class="subtitle">Your daily essentials, delivered fresh</div>
+  <h2>Welcome Back</h2>
+
+  {% if error %}
+  <div class="error-msg">⚠ {{ error }}</div>
+  {% endif %}
+  {% if success %}
+  <div class="success-msg">✅ {{ success }}</div>
+  {% endif %}
+
+  <form method="POST" action="/login">
+    <div class="form-group">
+      <label>Email Address</label>
+      <input type="email" name="email" placeholder="you@example.com" required>
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" name="password" placeholder="Enter your password" required>
+    </div>
+    <button type="submit" class="btn-login">Login →</button>
+  </form>
+
+  <a href="/forgot-password" class="forgot-link">🔑 Forgot Password?</a>
+  <a href="/register" class="btn-register">Don't have an account? Register</a>
+
+  <div class="demo-accounts">
+    <strong>🔑 Demo Accounts</strong>
+    <span>Admin: admin@grocery.com / admin123</span>
+    <span>Delivery: delivery@grocery.com / delivery123</span>
+    <span>User: Register a new account</span>
+  </div>
+</div>
+</body>
+</html>

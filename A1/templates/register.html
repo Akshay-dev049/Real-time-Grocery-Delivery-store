@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Register – FreshGrocery</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Poppins:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Nunito',sans-serif;min-height:100vh;display:flex;
+       background:linear-gradient(135deg,#27ae60 0%,#2a5298 60%,#1e3c72 100%);
+       align-items:center;justify-content:center;padding:30px 16px;}
+
+  .auth-card{background:white;border-radius:20px;padding:44px 40px;width:100%;max-width:480px;
+             box-shadow:0 20px 60px rgba(0,0,0,.25);}
+
+  .logo{font-family:'Poppins',sans-serif;font-size:1.8rem;font-weight:800;color:#1e3c72;
+        text-align:center;margin-bottom:6px;}
+  .logo span{color:#27ae60;}
+  .subtitle{text-align:center;color:#636e72;font-size:14px;margin-bottom:28px;}
+
+  h2{font-family:'Poppins',sans-serif;font-size:1.35rem;font-weight:800;
+     margin-bottom:22px;color:#2d3436;}
+
+  /* ── FORM FIELDS ── */
+  .form-group{margin-bottom:16px;}
+  .form-group label{display:block;font-size:12px;font-weight:700;color:#636e72;
+                    margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;}
+  .form-group input,
+  .form-group select{
+    width:100%;padding:13px 16px;border:2px solid #dfe6e9;border-radius:10px;
+    font-size:14px;font-family:'Nunito',sans-serif;outline:none;
+    transition:border-color .2s;background:white;color:#2d3436;
+    appearance:auto;
+  }
+  .form-group input:focus,
+  .form-group select:focus{border-color:#27ae60;box-shadow:0 0 0 3px rgba(39,174,96,.08);}
+
+  .field-note{font-size:11px;color:#636e72;margin-top:5px;line-height:1.5;}
+
+  /* ── SECURITY QUESTION SECTION ── */
+  .sq-section{
+    background:#f0f9ff;border:2px solid #bee3f8;border-radius:12px;
+    padding:18px;margin-bottom:18px;
+  }
+  .sq-title{
+    font-size:13px;font-weight:800;color:#1e3c72;margin-bottom:14px;
+    display:flex;align-items:center;gap:6px;
+  }
+  .sq-title span{font-weight:400;color:#636e72;font-size:12px;}
+  .sq-section .form-group:last-child{margin-bottom:0;}
+
+  /* ── BUTTONS ── */
+  .btn-register{
+    width:100%;padding:14px;
+    background:linear-gradient(135deg,#27ae60,#2ecc71);
+    color:white;border:none;border-radius:10px;font-size:16px;font-weight:800;
+    font-family:'Nunito',sans-serif;cursor:pointer;margin-top:8px;transition:opacity .2s;
+  }
+  .btn-register:hover{opacity:.9;}
+
+  .btn-login{
+    display:block;text-align:center;margin-top:14px;padding:13px;
+    background:#f0f3f4;border:none;border-radius:10px;font-size:14px;font-weight:700;
+    font-family:'Nunito',sans-serif;cursor:pointer;color:#2d3436;
+    transition:background .2s;text-decoration:none;
+  }
+  .btn-login:hover{background:#dfe6e9;}
+
+  /* ── ALERTS ── */
+  .error-msg{
+    background:#fdf0f0;color:#c0392b;padding:12px 16px;border-radius:8px;
+    font-size:13px;font-weight:600;margin-bottom:18px;
+    border-left:4px solid #e74c3c;line-height:1.5;
+  }
+  .success-msg{
+    background:#d4edda;color:#155724;padding:12px 16px;border-radius:8px;
+    font-size:13px;font-weight:600;margin-bottom:18px;
+    border-left:4px solid #27ae60;line-height:1.5;
+  }
+
+  /* ── PASSWORD STRENGTH ── */
+  .pw-bar{height:4px;border-radius:4px;margin-top:8px;background:#f0f0f0;overflow:hidden;}
+  .pw-bar-fill{height:100%;border-radius:4px;width:0;transition:width .3s,background .3s;}
+  .pw-hint{font-size:11px;color:#636e72;margin-top:5px;}
+</style>
+</head>
+<body>
+<div class="auth-card">
+  <div class="logo">🛒 Fresh<span>Grocery</span></div>
+  <div class="subtitle">Create your account and start shopping fresh</div>
+  <h2>Create Account</h2>
+
+  {% if error %}
+  <div class="error-msg">⚠ {{ error }}</div>
+  {% endif %}
+  {% if success %}
+  <div class="success-msg">✅ {{ success }} <a href="/login" style="color:#155724;font-weight:800;text-decoration:underline;">Login now →</a></div>
+  {% endif %}
+
+  <form method="POST" action="/register" onsubmit="return validateForm()">
+
+    <!-- Full Name -->
+    <div class="form-group">
+      <label>Full Name *</label>
+      <input type="text" name="name" placeholder="Your full name"
+             required autofocus autocomplete="name">
+    </div>
+
+    <!-- Email -->
+    <div class="form-group">
+      <label>Email Address *</label>
+      <input type="email" name="email" placeholder="you@example.com"
+             required autocomplete="email">
+    </div>
+
+    <!-- Phone (optional) -->
+    <div class="form-group">
+      <label>Phone Number</label>
+      <input type="tel" name="phone" placeholder="+91 9876543210"
+             pattern="[+\d\s\-]{7,15}" autocomplete="tel">
+      <div class="field-note">📱 Optional — used for delivery updates</div>
+    </div>
+
+    <!-- Password -->
+    <div class="form-group">
+      <label>Password *</label>
+      <input type="password" name="password" id="pwField"
+             placeholder="Minimum 6 characters"
+             required minlength="6"
+             oninput="checkStrength(this.value)"
+             autocomplete="new-password">
+      <div class="pw-bar"><div class="pw-bar-fill" id="pwBar"></div></div>
+      <div class="pw-hint" id="pwHint">Enter at least 6 characters</div>
+    </div>
+
+    <!-- ── SECURITY QUESTION SECTION ── -->
+    <div class="sq-section">
+      <div class="sq-title">
+        🔐 Security Question
+        <span>(used to recover your password)</span>
+      </div>
+
+      <div class="form-group">
+        <label>Choose a Question *</label>
+        <select name="security_question" id="secQuestion"
+                required onchange="updatePlaceholder()">
+          <option value="">-- Select a security question --</option>
+          <option value="What is your favourite IPL team?">⚾ What is your favourite IPL team?</option>
+          <option value="What is your favourite person's name?">👤 What is your favourite person's name?</option>
+          <option value="What is your date of birth?">🎂 What is your date of birth? (DD/MM/YYYY)</option>
+          <option value="What is your mother's maiden name?">👩 What is your mother's maiden name?</option>
+          <option value="What is the name of your first pet?">🐾 What is the name of your first pet?</option>
+          <option value="What is your favourite movie?">🎬 What is your favourite movie?</option>
+          <option value="What is your childhood nickname?">😄 What is your childhood nickname?</option>
+          <option value="What city were you born in?">🏙️ What city were you born in?</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Your Answer *</label>
+        <input type="text" name="security_answer" id="secAnswer"
+               placeholder="Type your answer here..."
+               required autocomplete="off">
+        <div class="field-note">
+          💡 Case-insensitive — "CSK" and "csk" are treated the same. Remember this answer!
+        </div>
+      </div>
+    </div>
+
+    <button type="submit" class="btn-register">Create Account →</button>
+  </form>
+
+  <a href="/login" class="btn-login">Already have an account? Login →</a>
+</div>
+
+<script>
+// Placeholder hints per question
+const placeholders = {
+  'What is your favourite IPL team?':       'e.g. CSK, MI, RCB...',
+  "What is your favourite person's name?":  'e.g. Sachin, MS Dhoni...',
+  'What is your date of birth?':            'e.g. 15/08/2000',
+  "What is your mother's maiden name?":     'e.g. Sharma',
+  'What is the name of your first pet?':    'e.g. Tommy',
+  'What is your favourite movie?':          'e.g. Baahubali',
+  'What is your childhood nickname?':       'e.g. Chotu',
+  'What city were you born in?':            'e.g. Hyderabad',
+};
+
+function updatePlaceholder() {
+  const q = document.getElementById('secQuestion').value;
+  const a = document.getElementById('secAnswer');
+  a.placeholder = placeholders[q] || 'Type your answer here...';
+  a.focus();
+}
+
+function checkStrength(val) {
+  const bar  = document.getElementById('pwBar');
+  const hint = document.getElementById('pwHint');
+  if (!bar) return;
+
+  let score = 0;
+  if (val.length >= 6)             score++;
+  if (val.length >= 10)            score++;
+  if (/[A-Z]/.test(val))          score++;
+  if (/[0-9]/.test(val))          score++;
+  if (/[^a-zA-Z0-9]/.test(val))  score++;
+
+  const labels = ['', 'Weak', 'Fair', 'Good', 'Strong', 'Very Strong'];
+  const colors = ['', '#e74c3c', '#f39c12', '#f1c40f', '#27ae60', '#1e3c72'];
+
+  bar.style.width      = (score * 20) + '%';
+  bar.style.background = colors[score] || '#e74c3c';
+  hint.textContent     = score > 0 ? `Strength: ${labels[score]}` : 'Enter at least 6 characters';
+}
+
+function validateForm() {
+  const pw  = document.getElementById('pwField').value;
+  const sq  = document.getElementById('secQuestion').value;
+  const sa  = document.getElementById('secAnswer').value.trim();
+
+  if (pw.length < 6) {
+    alert('Password must be at least 6 characters.');
+    return false;
+  }
+  if (!sq) {
+    alert('Please select a security question.');
+    return false;
+  }
+  if (!sa) {
+    alert('Please provide an answer to the security question.');
+    return false;
+  }
+  return true;
+}
+</script>
+</body>
+</html>

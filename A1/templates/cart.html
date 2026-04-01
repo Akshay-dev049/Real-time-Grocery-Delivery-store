@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cart – FreshGrocery</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<style>
+  .page-container { max-width: 1100px; margin: 30px auto; padding: 0 20px; display: flex; gap: 30px; align-items: flex-start; }
+  .cart-main { flex: 1; }
+  .cart-summary { width: 300px; background: white; border-radius: 14px; padding: 24px; box-shadow: 0 4px 20px rgba(0,0,0,.08); position: sticky; top: 80px; }
+  .cart-table { background: white; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,.08); }
+  .cart-table table { margin: 0; }
+  .qty-controls { display: flex; align-items: center; gap: 10px; justify-content: center; }
+  .qty-btn { width: 28px; height: 28px; border: 2px solid #dfe6e9; background: white; border-radius: 50%; cursor: pointer; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; transition: all .2s; }
+  .qty-btn:hover { background: #1e3c72; color: white; border-color: #1e3c72; }
+  .qty-value { font-weight: 800; font-size: 15px; min-width: 24px; text-align: center; }
+  .remove-x { background: none; border: none; color: #e74c3c; font-size: 18px; cursor: pointer; padding: 4px; }
+  .summary-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 15px; }
+  .summary-total { display: flex; justify-content: space-between; padding: 14px 0 6px; font-size: 1.2rem; font-weight: 800; color: #1e3c72; }
+  .btn-checkout { display: block; width: 100%; padding: 14px; background: linear-gradient(135deg, #e74c3c, #c0392b); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 800; font-family: 'Nunito', sans-serif; cursor: pointer; margin-top: 14px; transition: opacity .2s; text-align: center; text-decoration: none; }
+  .btn-checkout:hover { opacity: .9; }
+  .empty-cart { text-align: center; padding: 80px 20px; color: #636e72; }
+  .empty-cart .icon { font-size: 5rem; margin-bottom: 16px; }
+  .page-title { font-size: 1.8rem; font-weight: 800; margin-bottom: 20px; font-family: 'Poppins', sans-serif; }
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div class="navbar-brand">🛒 Fresh<span style="color:#27ae60;">Grocery</span></div>
+  <div class="nav-right">
+    {% if user %}<span>👤 {{ user.name }}</span>{% endif %}
+    <a href="/" style="color:white;">🏠 Home</a>
+    <a href="/logout" style="color:white;">Logout</a>
+  </div>
+</nav>
+
+<div class="page-container">
+  <div class="cart-main">
+    <div class="page-title">🛒 Your Cart</div>
+    <div class="cart-table">
+      <table id="cartTable">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Product</th>
+            <th>Price</th>
+            <th>Quantity</th>
+            <th>Subtotal</th>
+          </tr>
+        </thead>
+        <tbody id="cartBody">
+          <tr id="loadingRow"><td colspan="5" style="text-align:center;padding:40px;color:#636e72;">Loading cart...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="cart-summary">
+    <h3 style="margin-bottom:16px;font-family:'Poppins',sans-serif;">Order Summary</h3>
+    <div class="summary-row"><span>Subtotal</span><span>₹<span id="subtotal">0</span></span></div>
+    <div class="summary-row"><span>Delivery</span><span style="color:#27ae60;font-weight:700;">FREE</span></div>
+    <div class="summary-total"><span>Total</span><span>₹<span id="total">0</span></span></div>
+    <a href="/checkout" class="btn-checkout">Proceed to Checkout →</a>
+    <a href="/" style="display:block;text-align:center;margin-top:12px;color:#636e72;font-size:13px;">← Continue Shopping</a>
+  </div>
+</div>
+
+<script>
+function loadCart() {
+  fetch('/get-cart')
+  .then(res => res.json())
+  .then(cart => {
+    const tbody = document.getElementById('cartBody');
+    tbody.innerHTML = '';
+    let total = 0;
+
+    if (cart.length === 0) {
+      tbody.innerHTML = `
+        <tr><td colspan="5">
+          <div class="empty-cart">
+            <div class="icon">🛒</div>
+            <h2>Your cart is empty</h2>
+            <p>Add some fresh groceries!</p>
+            <a href="/" style="display:inline-block;margin-top:16px;padding:12px 24px;background:#1e3c72;color:white;border-radius:8px;font-weight:700;">Shop Now</a>
+          </div>
+        </td></tr>`;
+      return;
+    }
+
+    cart.forEach(item => {
+      const sub = item.price * item.qty;
+      total    += sub;
+      tbody.innerHTML += `
+        <tr id="row-${item.id}">
+          <td><button class="remove-x" onclick="removeItem(${item.id})">✕</button></td>
+          <td style="text-align:left;font-weight:700;">${item.name}</td>
+          <td>₹${item.price}</td>
+          <td>
+            <div class="qty-controls">
+              <button class="qty-btn" onclick="updateQty(${item.id},'decrease')">−</button>
+              <span class="qty-value">${item.qty}</span>
+              <button class="qty-btn" onclick="updateQty(${item.id},'increase')">+</button>
+            </div>
+          </td>
+          <td style="font-weight:800;color:#1e3c72;">₹${sub.toFixed(2)}</td>
+        </tr>`;
+    });
+
+    document.getElementById('subtotal').innerText = total.toFixed(2);
+    document.getElementById('total').innerText    = total.toFixed(2);
+  });
+}
+
+function updateQty(id, action) {
+  fetch('/update-cart', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ id, action })
+  }).then(() => loadCart());
+}
+
+function removeItem(id) {
+  fetch('/remove-item', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ id })
+  }).then(() => loadCart());
+}
+
+loadCart();
+</script>
+</body>
+</html>
